@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+  <style>
+    body { margin:0;position:fixed;top:0;right:0;bottom:0;left:0; }
+  </style>
+</head>
+
+<body>
+  <script>
+    
+    var data=d3.text('set_donnees_essai.csv',function(error,raw) {
+      var dsv=d3.dsvFormat(';');
+      var data=dsv.parse(raw);
+			data.forEach(function(d) {
+        d.nom=d["Name"];
+        d.rayon= +d["Radius (RJ)"];
+        d.masse= +d["Mass (MJ)"]
+        d.sm_axis= +d["Semi-major axis (AU)"];
+        d.methode=d["Discovery method"];
+        d.distance= +d["Distance (ly)"];
+        d.etoile_M= +d["Host star mass (M?)"];
+        d.etoile_T= +d["Host star temp. (K)"];
+      });
+
+
+    
+    var margin = {top: 20, right: 30, bottom: 20, left: 30};
+    var width = 960 - margin.left - margin.right;
+    var height = 500 - margin.top - margin.bottom;
+    
+    var couleur = d3.scaleOrdinal(d3.schemeCategory20);
+    
+    var svg = d3.select("body").append("svg")
+    	.attr("width", width + margin.left + margin.right)
+			.attr("height", height + margin.top + margin.bottom)
+    	.append("g")
+    		.attr("transform","translate(" +margin.left+ ","+margin.top +")" );
+ 
+    var x=d3.scaleLinear()
+    	.range([0,width])
+    	.domain(d3.extent(data, function(d){return d.sm_axis;})).nice();
+    
+    var y=d3.scaleLinear()
+    	.range([height,0])
+    	.domain(d3.extent(data, function(d){return d.etoile_M;})).nice();
+  
+    var xAxis=d3.axisBottom().scale(x);
+    var yAxis=d3.axisLeft().scale(y);
+
+    svg.append("g")
+    	.attr("class","x axis")
+    	.attr("transform", "translate(0,"+ height + ")")
+    	.call(xAxis);
+
+    svg.append("text")
+      .attr("x", width-margin.right-100)
+      .attr("y", height-margin.bottom)
+      .attr("class", "label")
+      .text("Demi-grand axe en UA");
+    
+    svg.append("g")
+    	.attr("class","y axis")
+    	.attr("transform", "translate(0,"+ 0 + ")")
+    	.call(yAxis);
+
+    svg.append("text")
+      .attr("x", margin.left)
+      .attr("y", margin.top-20)
+      .attr("class", "label")
+      .text("Masse de l'étoile en masses solaires");
+    
+    console.log(svg)
+    
+    var r =d3.scaleLinear()
+    	.range([2,8])
+    	.domain(d3.extent(data, function(d){return d.masse;})).nice();
+    
+		svg.selectAll(".dot").data(data).enter().append("circle")
+      .attr("class", "dot")
+      .attr("r", function(d) {return r(d.masse)})
+      .attr("cx", function(d) { return x(d.sm_axis); })
+      .attr("cy", function(d) { return y(d.etoile_M); })
+    	.attr("fill",function(d) {return couleur(d.discovery_method)});
+     
+    var legend=svg.selectAll(".legend")
+    	.data(couleur.domain())
+      .enter().append("g")
+    	.attr('class','legend')
+      .attr("transform", function
+(d, i) { 
+return
+"translate(0,"
+ + i * 
+20
+ + 
+")"
+; });
+    
+     
+    
+    });  
+  </script>
+</body>
