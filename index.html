@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <script src="https://d3js.org/d3.v4.min.js"></script>
@@ -8,20 +8,28 @@
 </head>
 
 <body>
+	<div id=figure></div>
+    <div>
+    <p>Le graphe suivant représente la distance des exoplanètes découvertes jusqu'ici à leur étoile en fonction de la masse de cette dernière. Une estimation grossière de la zone habitable d'une étoile en fonction de sa masse a été réalisée, et correspond à la zone verte du graphe.
+	<br />En raison de données manquantes, on n'a pas pu représenter les exoplanètes détectées par d'autres méthodes; ces dernières se situent néanmoins loin de la zone habitable de leur étoile.</p>
+    </div>
   <script>
     
-    var data=d3.text('set_donnees_essai.csv',function(error,raw) {
+	var format=d3.format('.2s');
+	
+    var data=d3.text('planetes.csv',function(error,raw)     {
       var dsv=d3.dsvFormat(';');
       var data=dsv.parse(raw);
       data.forEach(function(d) {
         d.nom=d["Name"];
-        d.rayon= +d["Radius (RJ)"];
+        //d.rayon= +d["Radius (RJ)"];
         d.masse= +d["Mass (MJ)"]
         d.sm_axis= +d["Semi-major axis (AU)"];
         d.methode=d["Discovery method"];
         d.distance= +d["Distance (ly)"];
-        d.etoile_M= +d["Host star mass (M?)"];
-        d.etoile_T= +d["Host star temp. (K)"];
+        d.etoile_M= +d["Host star mass (Ms)"];
+        //d.etoile_T= +d["Host star temp. (K)"];
+		console.log(d.masse);
       });
 
 
@@ -30,13 +38,13 @@
     var width = 960 - margin.left - margin.right;
     var height = 500 - margin.top - margin.bottom;
     
-    var couleur = d3.scaleOrdinal(d3.schemeCategory20);
+    var couleur = d3.scaleOrdinal(d3.schemeCategory10);
     
-    var svg = d3.select("body").append("svg")
-    	.attr("width", width + margin.left + margin.right)
-	.attr("height", height + margin.top + margin.bottom)
-    	.append("g")
-    	.attr("transform","translate(" +margin.left+ ","+margin.top +")" );
+    var svg = d3.select("#figure").append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform","translate(" +margin.left+ ","+margin.top +")" );
  
     var x=d3.scaleLinear()
     	.range([0,width])
@@ -45,14 +53,54 @@
     var y=d3.scaleLinear()
     	.range([height,0])
     	.domain(d3.extent(data, function(d){return d.etoile_M;})).nice();
+
+    var masses_etoiles=d3.range(0,y.domain()[1],0.05);
+    var zone_habitable_int=masses_etoiles.map(function(d) {return 0.95*Math.pow(d,1.5)});
+    var zone_habitable_ext=masses_etoiles.map(function(d) {return 1.5*Math.pow(d,1.5)});
+    
+    var y_habitable=d3.scaleLinear()
+      .range([height,0])
+      .domain([0,masses_etoiles.length]);
+
+    var x_habitable_int=d3.scaleLinear()
+      .range([0,d3.max(zone_habitable_int)/d3.max(x.domain())*width])
+      .domain([0,d3.max(zone_habitable_int)]);
+
+    var x_habitable_ext=d3.scaleLinear()
+      .range([0,d3.max(zone_habitable_ext)/d3.max(x.domain())*width])
+      .domain([0,d3.max(zone_habitable_ext)]);
+
+    var ligne_int=d3.line()
+      .x(function(d,i) {return x_habitable_int(d)})
+      .y(function(d,i) {return y_habitable(i)}); 
+
+    var ligne_ext=d3.line()
+      .x(function(d,i) {return x_habitable_ext(d)})
+      .y(function(d,i) {return y_habitable(i)});
+
+
+    svg.append("path")
+      .data([zone_habitable_int])
+      .attr("class","line")
+      .attr("d",ligne_int)
+      .style('opacity',0.4)
+      .style('fill','green')
+      .style('stroke','green');
+
+    svg.append("path")
+      .data([zone_habitable_ext])
+      .attr("class","line")
+      .attr("d",ligne_ext)
+      .style('fill','white')
+      .style('stroke','none'); 
   
     var xAxis=d3.axisBottom().scale(x);
     var yAxis=d3.axisLeft().scale(y);
 
     svg.append("g")
-    	.attr("class","x axis")
-    	.attr("transform", "translate(0,"+ height + ")")
-    	.call(xAxis);
+      .attr("class","x axis")
+      .attr("transform", "translate(0,"+ height + ")")
+      .call(xAxis);
 
     svg.append("text")
       .attr("x", width-margin.right-100)
@@ -61,44 +109,86 @@
       .text("Demi-grand axe en UA");
     
     svg.append("g")
-    	.attr("class","y axis")
-    	.attr("transform", "translate(0,"+ 0 + ")")
-    	.call(yAxis);
+      .attr("class","y axis")
+      .attr("transform", "translate(0,"+ 0 + ")")
+      .call(yAxis);
 
     svg.append("text")
       .attr("x", margin.left)
       .attr("y", margin.top-20)
       .attr("class", "label")
-      .text("Masse de l'�toile en masses solaires");
-
+      .text("Masse de l'étoile-hôte en masses solaires");
     
-    var r =d3.scaleLinear()
-    	.range([2,8])
-    	.domain(d3.extent(data, function(d){return d.masse;})).nice();
+    var r =d3.scaleLog()
+      .base(Math.E)
+      .range([2,8])
+      .domain(d3.extent(data, function(d){return d.masse;})).nice();
     
+    var tooltip=d3.select("body").append("div")
+      .attr("class","tooltip")
+      .style("opacity",0)
+      .style('background','lightsteelblue');
+      
     svg.selectAll(".dot").data(data).enter().append("circle")
       .attr("class", "dot")
       .attr("r", function(d) {return r(d.masse)})
       .attr("cx", function(d) { return x(d.sm_axis); })
       .attr("cy", function(d) { return y(d.etoile_M); })
-      .attr("fill",function(d) {return couleur(d.discovery_method)});
-     
-    /*var legend=svg.selectAll(".legend")
-    	.data(couleur.domain())
+      .attr("fill",function(d) {return couleur(d.methode)})
+      .attr('stroke','black')
+      .attr('stroke-width',1)
+      .on("mouseover",function(d){
+      	d3.select(this).attr('stroke-width',3);
+      	tooltip.transition()
+          .duration(0)
+          .style("opacity",1)
+		  .style('position','absolute')
+        tooltip .html(d.nom+"</br>Distance à la Terre: "+format(d.distance)+' a.l'+"</br>Masse: "+format(d.masse)+" masses joviennes"+"<br />Soit "+format(d.masse*317.83)+' masses terrestres')
+          .style('left',(d3.event.pageX+5)+'px')
+          .style('top',(d3.event.pageY-28)+'px');
+    	  })
+    	.on('mouseout',function(d){
+          d3.select(this).attr('stroke-width',1);
+          tooltip.transition()
+            .duration(500)
+            .style("opacity",0)
+			.style('position','relative');
+          });
+    
+    var legend=svg.selectAll(".legend")
+      .data(couleur.domain())
       .enter().append("g")
-    	.attr('class','legend')
-      .attr("transform", function
-(d, i) { 
-return
-"translate(0,"
- + i * 
-20
- + 
-")"
-; }); */
+      .attr('class','legend')
+      .attr("transform",function(d, i){ return "translate(0," + (30+i * 23) +")";})
+
+    svg.append('text')
+      .attr('class','titre-legende')
+      .attr('x',width-150-9)
+      .attr('y',15)
+      .text('Découverte par:');
     
-     
+    legend.append('circle')
+      .attr('class','dot')
+      .attr('cx',width-150)
+      .attr('r',9)
+      .attr('fill',function(d) {return couleur(d)})
+      .attr('stroke','black');
     
+    legend.append('text')
+      .attr('x',width-120)
+      .attr("dy", ".4em")
+      .text(function(d) { return d});
+	  
+	svg .append('rect')
+	  .attr('x',width-165)
+	  .attr('y',0)
+	  .attr('width',130)
+	  .attr('height',90)
+	  .style('fill','none')
+	  .style('stroke','black')
+	  .style('position','absolute');
+
     });  
   </script>
+
 </body>
